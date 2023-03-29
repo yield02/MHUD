@@ -1,38 +1,60 @@
-from sklearn.model_selection import KFold
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.metrics import accuracy_score
 import pandas as pd
+import numpy as np
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.metrics import f1_score
+from sklearn.model_selection import KFold, cross_val_score
+from sklearn.ensemble import RandomForestClassifier
 
 # Load data
-df = pd.read_csv('https://archive.ics.uci.edu/ml/machine-learning-databases/yeast/yeast.data', sep='\s+', header=None)
-X = df.iloc[:, 1:8].values
-y = df.iloc[:, -1].values
+data = pd.read_csv('yeast.data', header=None, delimiter='\s+', usecols=list(range(1, 10)))
 
-# Initialize K-Fold
-kf = KFold(n_splits=100, shuffle=True, random_state=42)
+data = data.replace('?', np.nan)
 
-# Initialize Gaussian Naive Bayes
+# Loại bỏ các hàng dòng chứa giá trị NULL
+data = data.dropna()
 
-knn = KNeighborsClassifier()
+# data.mean() là giá trị trung bình của dữ liệu
+# data.std() là độ lệch chuẩn của dữ liệu
+z_scores = (data - data.mean()) / data.std()
 
-# Initialize accuracy list
-accuracy_list = []
+#loại bỏ điểm dữ liệu dị thường
+# các giá trị ngoại lai có giá trị tuyệt đối lớn hơn 3 lần độ lệch chuẩn so với giá trị trung bình sẽ bị loại bỏ khỏi dữ liệu.
+data = data[(np.abs(z_scores) < 3).all(axis=1)]
 
-# Loop through each fold
+X = data.iloc[:, :-1]
+y = data.iloc[:, -1]
+
+kf = KFold(n_splits=10, shuffle=True)
+
+clf = DecisionTreeClassifier()
+rf = RandomForestClassifier(n_estimators=100, random_state=42)
+knn = KNeighborsClassifier(n_neighbors=5)
+
+
+
+knn_f1_scores = []
+dt_f1_scores = []
 for train_index, test_index in kf.split(X):
-    # Split data
-    X_train, X_test = X[train_index], X[test_index]
-    y_train, y_test = y[train_index], y[test_index]
-
-    # Fit model and predict
+    X_train, X_test = X.iloc[train_index], X.iloc[test_index]
+    y_train, y_test = y.iloc[train_index], y.iloc[test_index]
+    # KNN
     knn.fit(X_train, y_train)
-    y_pred = knn.predict(X_test)
+    knn_y_pred = knn.predict(X_test)
+    knn_f1 = f1_score(y_test, knn_y_pred, average='weighted')
+    knn_f1_scores.append(knn_f1)
 
-    # Calculate accuracy and append to list
-    accuracy = accuracy_score(y_test, y_pred)
-    accuracy_list.append(accuracy)
+    # Decision Tree
+    clf.fit(X_train, y_train)
+    y_pred = clf.predict(X_test)
+    dt_f1 = f1_score(y_test, y_pred, average='weighted')
+    dt_f1_scores.append(dt_f1)
 
-# Calculate average accuracy
-average_accuracy = sum(accuracy_list) / len(accuracy_list)
 
-print(f'Average accuracy: {average_accuracy}')
+
+# Evaluate the model using F1-score
+rf_f1_scores = cross_val_score(rf, X, y, cv=kf, scoring='f1_weighted')
+
+print("KNN-F1-Score:", np.mean(knn_f1_scores))
+print("Decision Tree F1-score:", np.mean(dt_f1_scores))
+print("Random forest F1-Score:", rf_f1_scores.mean())
