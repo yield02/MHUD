@@ -25,7 +25,7 @@ X = imputer.fit_transform(X)
 rf = RandomForestClassifier(n_estimators=100)
 
 # Khởi tạo đối tượng KFold với 100 folds
-kf = KFold(n_splits=100, shuffle=True, random_state=42)
+kf = KFold(n_splits=10, shuffle=True, random_state=42)
 
 # Tính accuracy trung bình với cross validation
 scores = cross_val_score(rf, X, y, cv=kf)
